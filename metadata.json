@@ -1,0 +1,8 @@
+{
+  "name": "StreamX Pro",
+  "description": "The Ultimate NewPipe Clone - High-performance media client with OLED theme, background play simulation, and pro features.",
+  "requestFramePermissions": [
+    "microphone",
+    "camera"
+  ]
+}
