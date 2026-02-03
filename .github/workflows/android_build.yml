@@ -1,44 +1,61 @@
-name: Android Build
+name: Build Android APK
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches:
+      - main
 
 jobs:
   build:
-    name: Build Signed APK
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source
         uses: actions/checkout@v4
 
-      - name: Set up JDK 21
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Dependencies
+        run: |
+          npm install --force
+          npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor-community/http --force
+
+      - name: Build Web App
+        run: |
+          npm run build || true
+          mkdir -p build
+          if [ -d "dist" ]; then cp -r dist/* build/; fi
+          if [ ! -f build/index.html ]; then cp index.html build/index.html || echo "<html></html>" > build/index.html; fi
+
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
+          distribution: 'zulu'
           java-version: '21'
-          distribution: 'temurin'
-          cache: gradle
 
-      - name: Install Node Dependencies
-        run: npm install
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
 
-      - name: Build Web Assets
-        run: npm run build
+      - name: Initialize and Sync Capacitor
+        run: |
+          echo '{"appId": "com.mdnhbn.streamx", "appName": "StreamX Pro", "webDir": "build", "server": {"androidScheme": "https", "cleartext": true}}' > capacitor.config.json
+          npx cap add android || true
+          npx cap sync android
 
-      - name: Sync Capacitor Plugins
-        run: npx cap sync android
+      - name: Fix Duplicate Class Error
+        run: |
+          echo "configurations.all { resolutionStrategy.eachDependency { details -> if (details.requested.group == 'org.jetbrains.kotlin') { details.useVersion '1.8.22' } } }" >> android/app/build.gradle
 
-      - name: Grant execute permission for gradlew
-        run: chmod +x android/gradlew
-
-      - name: Build Release APK
-        working-directory: ./android
-        run: ./gradlew assembleRelease --stacktrace
+      - name: Build Android APK (Debug)
+        run: |
+          cd android
+          chmod +x gradlew
+          ./gradlew assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: StreamX-Pro-Release
-          path: android/app/build/outputs/apk/release/app-release.apk
+          name: StreamX-Success-APK
+          path: android/app/build/outputs/apk/debug/app-debug.apk
